@@ -1,0 +1,13 @@
+{
+  "name": "C++ CI",
+  "description": "Build CMake-based C++ projects or syntax-check standalone C++ source files.",
+  "categories": [
+    "C++",
+    "CMake",
+    "Code quality"
+  ],
+  "filePatterns": [
+    "^CMakeLists\\.txt$",
+    ".*\\.(cpp|cc|cxx|hpp|hh|h)$"
+  ]
+}

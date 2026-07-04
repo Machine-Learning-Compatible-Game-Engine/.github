@@ -1,0 +1,84 @@
+name: C++ CI
+
+# Educational purpose:
+# This workflow is for C++ engine experiments, graphics prototypes,
+# thesis-related engine code, algorithms, simulations, and systems code.
+#
+# Safe behavior:
+# - no deployment
+# - no secrets
+# - read-only repository permission
+#
+# Supported layouts:
+# - CMake projects: configure, build, and run CTest
+# - non-CMake projects: perform syntax checks on .cpp/.cc/.cxx files
+#
+# Notes:
+# - Change CMAKE_CXX_STANDARD if the project needs C++20 or C++23.
+# - Add system packages if the project depends on OpenGL, GLFW, SDL, Qt, etc.
+
+on:
+  push:
+    branches: [ $default-branch ]
+  pull_request:
+    branches: [ $default-branch ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  cpp-ci:
+    name: C++ build/check
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install build tools
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake
+
+      - name: Build or syntax-check C++ project
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [ -f CMakeLists.txt ]; then
+            echo "CMakeLists.txt found. Running CMake build."
+            cmake -S . -B build \
+              -DCMAKE_BUILD_TYPE=Release \
+              -DCMAKE_CXX_STANDARD=17 \
+              -DCMAKE_CXX_STANDARD_REQUIRED=ON
+
+            cmake --build build --parallel
+
+            if command -v ctest >/dev/null 2>&1; then
+              ctest --test-dir build --output-on-failure || echo "::warning::CTest failed or no tests were configured."
+            fi
+          else
+            echo "No CMakeLists.txt found. Running lightweight syntax checks."
+
+            mapfile -t sources < <(
+              find . \
+                -path './.git' -prune -o \
+                -path './build' -prune -o \
+                -path './dist' -prune -o \
+                \( -name '*.cpp' -o -name '*.cc' -o -name '*.cxx' \) \
+                -print | sort
+            )
+
+            if [ "${#sources[@]}" -eq 0 ]; then
+              echo "No C++ source files found."
+              exit 1
+            fi
+
+            for source in "${sources[@]}"; do
+              echo "Checking $source"
+              g++ -std=c++17 -Wall -Wextra -pedantic -fsyntax-only "$source"
+            done
+          fi

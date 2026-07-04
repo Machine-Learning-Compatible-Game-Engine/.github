@@ -1,0 +1,14 @@
+{
+  "name": "Python CI",
+  "description": "Install Python dependencies, compile Python files, and run pytest when tests are present.",
+  "categories": [
+    "Python",
+    "Machine learning",
+    "Code quality"
+  ],
+  "filePatterns": [
+    "^requirements\\.txt$",
+    "^pyproject\\.toml$",
+    ".*\\.py$"
+  ]
+}

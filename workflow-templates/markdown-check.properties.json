@@ -1,0 +1,13 @@
+{
+  "name": "Markdown Documentation Check",
+  "description": "Validate README files, Markdown encoding, merge markers, and basic local Markdown links.",
+  "categories": [
+    "Markdown",
+    "Documentation"
+  ],
+  "filePatterns": [
+    ".*\\.md$",
+    "^README\\.md$",
+    "^docs/"
+  ]
+}

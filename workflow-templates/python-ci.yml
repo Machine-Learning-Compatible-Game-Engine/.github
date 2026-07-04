@@ -1,0 +1,82 @@
+name: Python CI
+
+# Educational purpose:
+# This workflow is for Python scripts, ML experiments, data-processing utilities,
+# small FastAPI tools, notebooks converted to scripts, and game-engine support code.
+#
+# Safe behavior:
+# - no deployment
+# - no secrets
+# - read-only repository permission
+# - tests run only if test files exist
+#
+# What it checks:
+# - dependencies install
+# - Python files compile
+# - pytest runs when tests are present
+
+on:
+  push:
+    branches: [ $default-branch ]
+  pull_request:
+    branches: [ $default-branch ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  python-ci:
+    name: Python ${{ matrix.python-version }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install dependencies
+        shell: bash
+        run: |
+          python -m pip install --upgrade pip
+
+          if [ -f requirements.txt ]; then
+            python -m pip install -r requirements.txt
+          fi
+
+          if [ -f pyproject.toml ]; then
+            python -m pip install -e . || echo "::warning::pyproject.toml exists, but editable install failed. This may be normal for non-package repos."
+          fi
+
+      - name: Compile Python files
+        shell: bash
+        run: |
+          python -m compileall -q .
+
+      - name: Run tests if present
+        shell: bash
+        run: |
+          if find . \
+            -path './.git' -prune -o \
+            -path './.venv' -prune -o \
+            -path './venv' -prune -o \
+            -name 'test_*.py' -print -quit | grep -q .; then
+            python -m pip install pytest
+            python -m pytest -q
+          elif [ -d tests ]; then
+            python -m pip install pytest
+            python -m pytest -q
+          else
+            echo "No Python tests found. Syntax compilation passed."
+          fi

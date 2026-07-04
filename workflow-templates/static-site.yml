@@ -1,0 +1,193 @@
+name: Static Site Build and Pages Deploy
+
+# Educational purpose:
+# This workflow is for simple static websites, GitHub Pages repos, teaching demos,
+# HTML/CSS/JS projects, and documentation sites.
+#
+# Safe behavior:
+# - pull requests only validate the site
+# - deployment runs only on push to the repository default branch
+# - token permissions are minimal
+#
+# Supported layouts:
+# - plain static site with index.html at repository root
+# - generated site in dist/, build/, out/, or public/
+# - optional Node build if package.json contains a build script
+
+on:
+  push:
+    branches: [ $default-branch ]
+  pull_request:
+    branches: [ $default-branch ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-validate:
+    name: Build and validate static site
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js if package.json exists
+        if: ${{ hashFiles('package.json') != '' }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install Node dependencies if lockfile exists
+        if: ${{ hashFiles('package-lock.json') != '' }}
+        run: npm ci
+
+      - name: Run Node build script if available
+        if: ${{ hashFiles('package.json') != '' }}
+        shell: bash
+        run: |
+          if node -e "const p=require('./package.json'); process.exit(p.scripts && p.scripts.build ? 0 : 1)"; then
+            npm run build
+          else
+            echo "No build script found; treating repository as a static HTML site."
+          fi
+
+      - name: Prepare static site artifact
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import shutil
+          import sys
+          from html.parser import HTMLParser
+          import urllib.parse
+
+          root = Path(".").resolve()
+          output = root / "_site"
+
+          if output.exists():
+              shutil.rmtree(output)
+
+          candidates = [
+              root / "dist",
+              root / "build",
+              root / "out",
+              root / "public",
+              root,
+          ]
+
+          source = None
+          for candidate in candidates:
+              if (candidate / "index.html").exists():
+                  source = candidate
+                  break
+
+          if source is None:
+              print("No index.html found in dist/, build/, out/, public/, or repository root.")
+              sys.exit(1)
+
+          ignored_names = {
+              ".git", ".github", "node_modules", "_site",
+              "workflow-templates", ".venv", "venv", ".cache"
+          }
+
+          def ignore_filter(directory, names):
+              return [name for name in names if name in ignored_names]
+
+          if source == root:
+              output.mkdir()
+              for item in root.iterdir():
+                  if item.name in ignored_names:
+                      continue
+                  destination = output / item.name
+                  if item.is_dir():
+                      shutil.copytree(item, destination, ignore=ignore_filter)
+                  else:
+                      shutil.copy2(item, destination)
+          else:
+              shutil.copytree(source, output, ignore=ignore_filter)
+
+          class AssetParser(HTMLParser):
+              def __init__(self):
+                  super().__init__()
+                  self.assets = []
+
+              def handle_starttag(self, tag, attrs):
+                  attrs = dict(attrs)
+                  for key in ("href", "src"):
+                      if key in attrs:
+                          self.assets.append(attrs[key])
+
+          errors = []
+
+          for html_file in output.rglob("*.html"):
+              parser = AssetParser()
+              text = html_file.read_text(encoding="utf-8", errors="replace")
+              parser.feed(text)
+
+              for raw in parser.assets:
+                  target = raw.strip()
+
+                  if (
+                      not target
+                      or target.startswith("#")
+                      or target.startswith("http://")
+                      or target.startswith("https://")
+                      or target.startswith("mailto:")
+                      or target.startswith("tel:")
+                      or target.startswith("//")
+                      or target.startswith("data:")
+                  ):
+                      continue
+
+                  parsed = urllib.parse.urlparse(target)
+                  if parsed.path.startswith("/"):
+                      candidate = output / parsed.path.lstrip("/")
+                  else:
+                      candidate = html_file.parent / urllib.parse.unquote(parsed.path)
+
+                  if not candidate.exists():
+                      rel_html = html_file.relative_to(output)
+                      errors.append(f"{rel_html}: missing referenced asset: {target}")
+
+          if errors:
+              print("Static site validation failed:\n")
+              for error in errors:
+                  print(f"- {error}")
+              sys.exit(1)
+
+          print(f"Prepared static site artifact from: {source.relative_to(root)}")
+          PY
+
+      - name: Upload GitHub Pages artifact
+        if: ${{ github.event_name == 'push' && github.ref_name == github.event.repository.default_branch }}
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: build-and-validate
+    if: ${{ github.event_name == 'push' && github.ref_name == github.event.repository.default_branch }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    permissions:
+      pages: write
+      id-token: write
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Deploy Pages artifact
+        id: deployment
+        uses: actions/deploy-pages@v4

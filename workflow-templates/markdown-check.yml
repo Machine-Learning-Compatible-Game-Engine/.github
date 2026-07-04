@@ -1,0 +1,117 @@
+name: Markdown Documentation Check
+
+# Educational purpose:
+# This workflow validates Markdown documentation in a lightweight way.
+# It is safe for teaching repos, documentation repos, curricula repos, and static project notes.
+#
+# What it checks:
+# - repository has Markdown files
+# - README.md exists
+# - Markdown files are valid UTF-8
+# - no unresolved Git merge conflict markers
+# - basic relative Markdown links point to existing files
+
+on:
+  push:
+    branches: [ $default-branch ]
+  pull_request:
+    branches: [ $default-branch ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  markdown-check:
+    name: Check Markdown documentation
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Validate Markdown files
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          import sys
+          import urllib.parse
+
+          root = Path(".").resolve()
+          ignored_dirs = {
+              ".git", ".github", "node_modules", ".venv", "venv",
+              "dist", "build", "_site", ".next", ".cache"
+          }
+
+          def is_ignored(path: Path) -> bool:
+              return any(part in ignored_dirs for part in path.parts)
+
+          md_files = [
+              p for p in root.rglob("*.md")
+              if not is_ignored(p.relative_to(root))
+          ]
+
+          errors = []
+
+          if not md_files:
+              errors.append("No Markdown files were found.")
+
+          if not (root / "README.md").exists():
+              errors.append("README.md is missing at repository root.")
+
+          link_pattern = re.compile(r'(?<!!)\[[^\]]+\]\(([^)]+)\)')
+
+          for path in md_files:
+              rel = path.relative_to(root)
+
+              try:
+                  text = path.read_text(encoding="utf-8")
+              except UnicodeDecodeError:
+                  errors.append(f"{rel}: file is not valid UTF-8.")
+                  continue
+
+              for marker in ("<<<<<<<", "=======", ">>>>>>>"):
+                  if marker in text:
+                      errors.append(f"{rel}: possible unresolved merge conflict marker: {marker}")
+
+              for match in link_pattern.finditer(text):
+                  raw_target = match.group(1).strip()
+                  target = raw_target.split()[0].strip("<>")
+
+                  if (
+                      target.startswith("#")
+                      or target.startswith("http://")
+                      or target.startswith("https://")
+                      or target.startswith("mailto:")
+                      or target.startswith("tel:")
+                  ):
+                      continue
+
+                  parsed = urllib.parse.urlparse(target)
+                  target_path = urllib.parse.unquote(parsed.path)
+
+                  if not target_path:
+                      continue
+
+                  candidate = (path.parent / target_path).resolve()
+
+                  try:
+                      candidate.relative_to(root)
+                  except ValueError:
+                      errors.append(f"{rel}: link points outside repository: {target}")
+                      continue
+
+                  if not candidate.exists():
+                      errors.append(f"{rel}: broken local link: {target}")
+
+          if errors:
+              print("Markdown validation failed:\n")
+              for error in errors:
+                  print(f"- {error}")
+              sys.exit(1)
+
+          print(f"Markdown validation passed for {len(md_files)} file(s).")
+          PY

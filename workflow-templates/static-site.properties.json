@@ -1,0 +1,15 @@
+{
+  "name": "Static Site Build and Pages Deploy",
+  "description": "Validate a static HTML site and deploy it to GitHub Pages from the default branch.",
+  "categories": [
+    "HTML",
+    "JavaScript",
+    "Pages"
+  ],
+  "filePatterns": [
+    "^index\\.html$",
+    "^package\\.json$",
+    "^vite\\.config\\.",
+    "^docs/"
+  ]
+}
