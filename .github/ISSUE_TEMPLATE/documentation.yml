@@ -1,29 +1,10 @@
-name: Documentation
-description: Suggest documentation changes or additions
-title: "[Docs]: "
-labels: ["documentation"]
+name: Documentation issue
+description: Report missing or unclear documentation
+title: "[DOC] <short description>"
+labels: documentation
 body:
   - type: textarea
-    id: area
+    id: problem
     attributes:
-      label: Documentation area
-      description: What page, file, or topic needs documentation?
-      placeholder: "Example: README setup section, architecture notes, examples..."
-    validations:
-      required: true
-
-  - type: textarea
-    id: issue
-    attributes:
-      label: Problem
-      description: What is missing, unclear, outdated, or incorrect?
-    validations:
-      required: true
-
-  - type: textarea
-    id: suggestion
-    attributes:
-      label: Suggested improvement
-      description: Describe the change you would like to see.
-    validations:
-      required: false
+      label: Problem description
+      description: What is unclear or missing?

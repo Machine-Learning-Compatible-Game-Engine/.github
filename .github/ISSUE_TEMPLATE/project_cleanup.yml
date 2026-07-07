@@ -1,0 +1,10 @@
+name: Project cleanup
+description: Request cleanup, archiving, or sanitization of a repository
+title: "[CLEANUP] <repo name>"
+labels: cleanup
+body:
+  - type: textarea
+    id: cleanup_type
+    attributes:
+      label: Cleanup type
+      description: Archive, remove secrets, restructure, etc.

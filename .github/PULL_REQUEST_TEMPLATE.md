@@ -1,21 +1,24 @@
 ## Summary
-
 Describe the change.
 
-## Reason
+## Type of change
+- [ ] Documentation
+- [ ] Bug fix
+- [ ] Feature
+- [ ] Cleanup
+- [ ] Repository migration
+- [ ] GitHub Pages / profile update
+- [ ] Workflow / CI
+- [ ] Security / privacy fix
 
-Why is this change needed?
+## Checklist
+- [ ] README updated if needed
+- [ ] Docs updated if needed
+- [ ] Links checked
+- [ ] No secrets or private data added
+- [ ] No generated/vendor files added unnecessarily
+- [ ] Status labels are accurate
+- [ ] Existing useful content was preserved
 
-## Changes
-
-- 
-- 
-- 
-
-## Testing / verification
-
-Describe how this was checked.
-
-## Notes
-
-Add any follow-up tasks, limitations, or context.
+## Related repositories / organizations
+List related repos or orgs.
